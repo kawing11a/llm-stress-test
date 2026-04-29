@@ -10,11 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
-  const [baseUrl, setBaseUrl] = useState('http://localhost:11434/v1');
+  const [baseUrl, setBaseUrl] = useState('http://192.168.0.184:11434/v1');
   const [apiKey, setApiKey] = useState('');
   const [models, setModels] = useState<any[]>([]);
   const [model, setModel] = useState('');
-  
+
   const [prompt, setPrompt] = useState('What is the meaning of life?');
   const [maxTokens, setMaxTokens] = useState('100');
   const [concurrency, setConcurrency] = useState('5');
@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [isRunning, setIsRunning] = useState(false);
   const [metrics, setMetrics] = useState<any[]>([]);
   const [stats, setStats] = useState({ success: 0, error: 0, avgTps: 0, p50: 0, p90: 0, p99: 0 });
+  const [logs, setLogs] = useState<any[]>([]);
 
   const fetchModels = async () => {
     try {
@@ -41,6 +42,7 @@ export default function Dashboard() {
     setIsRunning(true);
     setMetrics([]);
     setStats({ success: 0, error: 0, avgTps: 0, p50: 0, p90: 0, p99: 0 });
+    setLogs([]);
 
     try {
       const res = await fetch('/api/stress-test', {
@@ -65,29 +67,38 @@ export default function Dashboard() {
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
-        
+
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const dataStr = line.replace('data: ', '').trim();
             if (!dataStr) continue;
-            
+
             try {
               const data = JSON.parse(dataStr);
               if (data.message === 'Test completed') {
                 setIsRunning(false);
                 break;
               }
-              
-              if (data.status === 'success') {
+
+              if (data.type === 'start') {
+                setLogs(prev => {
+                  if (prev.some(l => l.id === data.id)) return prev;
+                  return [...prev, {
+                    id: data.id,
+                    prompt: data.prompt,
+                    response: '',
+                    latency: '...',
+                    ttft: '...'
+                  }];
+                });
+              } else if (data.type === 'stream') {
+                setLogs(prev => prev.map(l => l.id === data.id ? { ...l, response: l.response + data.chunk } : l));
+              } else if (data.status === 'success') {
                 successCount++;
                 tpsSum += data.tps;
                 latencies.push(data.latency);
-              } else {
-                errorCount++;
-              }
 
-              // Update charts
-              if (data.status === 'success') {
+                // Update charts
                 currentMetrics = [...currentMetrics, {
                   id: currentMetrics.length,
                   tps: Math.round(data.tps * 10) / 10,
@@ -95,18 +106,35 @@ export default function Dashboard() {
                   ttft: data.ttft
                 }];
                 setMetrics(currentMetrics);
+                
+                setLogs(prev => prev.map(l => l.id === data.id ? {
+                  ...l,
+                  response: data.response || l.response || '(No response text)',
+                  latency: data.latency,
+                  ttft: data.ttft
+                } : l));
+              } else if (data.status === 'error') {
+                errorCount++;
+                setLogs(prev => prev.map(l => l.id === data.id ? {
+                  ...l,
+                  response: `Error: ${data.error}`,
+                  latency: 'N/A',
+                  ttft: 'N/A'
+                } : l));
               }
 
-              // Update stats
-              latencies.sort((a, b) => a - b);
-              setStats({
-                success: successCount,
-                error: errorCount,
-                avgTps: successCount > 0 ? tpsSum / successCount : 0,
-                p50: latencies[Math.floor(latencies.length * 0.5)] || 0,
-                p90: latencies[Math.floor(latencies.length * 0.9)] || 0,
-                p99: latencies[Math.floor(latencies.length * 0.99)] || 0,
-              });
+              if (data.status === 'success' || data.status === 'error') {
+                // Update stats
+                latencies.sort((a, b) => a - b);
+                setStats({
+                  success: successCount,
+                  error: errorCount,
+                  avgTps: successCount > 0 ? tpsSum / successCount : 0,
+                  p50: latencies[Math.floor(latencies.length * 0.5)] || 0,
+                  p90: latencies[Math.floor(latencies.length * 0.9)] || 0,
+                  p99: latencies[Math.floor(latencies.length * 0.99)] || 0,
+                });
+              }
 
             } catch (e) {
               console.error("Failed to parse SSE JSON", e, dataStr);
@@ -178,9 +206,9 @@ export default function Dashboard() {
                 <Input type="number" value={totalRequests} onChange={e => setTotalRequests(e.target.value)} />
               </div>
             </div>
-            <Button 
-              onClick={startTest} 
-              disabled={isRunning || !model} 
+            <Button
+              onClick={startTest}
+              disabled={isRunning || !model}
               className="w-full mt-4"
             >
               {isRunning ? 'Running Test...' : 'Start Stress Test'}
@@ -234,6 +262,22 @@ export default function Dashboard() {
                 <Line type="monotone" dataKey="ttft" stroke="#ffc658" name="TTFT (ms)" dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Request Logs</CardTitle>
+            <CardDescription>Ask and Response for each request</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[400px] overflow-y-auto space-y-4">
+            {logs.map((log, idx) => (
+              <div key={idx} className="border p-4 rounded-md text-sm space-y-2 bg-muted/20">
+                <div className="font-semibold border-b pb-2">Request #{log.id} <span className="text-muted-foreground font-normal ml-2">(Latency: {log.latency}{log.latency !== '...' && log.latency !== 'N/A' ? 'ms' : ''} | TTFT: {log.ttft}{log.ttft !== '...' && log.ttft !== 'N/A' ? 'ms' : ''})</span></div>
+                <div><span className="font-semibold text-blue-500 mr-2">Ask:</span>{log.prompt}</div>
+                <div className="whitespace-pre-wrap"><span className="font-semibold text-green-500 mr-2">Response:</span>{log.response}</div>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>
