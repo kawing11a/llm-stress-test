@@ -4,7 +4,7 @@ import pLimit from 'p-limit';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { baseUrl, apiKey, model, prompt, concurrency, totalRequests, maxTokens } = body;
+    const { baseUrl, apiKey, model, prompt, concurrency, totalRequests, maxTokens, contextPadding } = body;
 
     if (!baseUrl || !model || !prompt || !concurrency || !totalRequests) {
       return new Response(JSON.stringify({ error: 'Missing required parameters' }), {
@@ -28,7 +28,16 @@ export async function POST(req: NextRequest) {
           let firstTokenTime = 0;
           let tokens = 0;
           
-          sendEvent('metrics', { type: 'start', id: i, prompt });
+          let finalPrompt = prompt;
+          const padTokens = parseInt(contextPadding) || 0;
+          if (padTokens > 0) {
+            const lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ";
+            const targetLength = padTokens * 4; // Approx 4 chars per token
+            const paddingStr = lorem.repeat(Math.ceil(targetLength / lorem.length)).substring(0, targetLength);
+            finalPrompt = `<padding>\n${paddingStr}\n</padding>\n\n${prompt}`;
+          }
+          
+          sendEvent('metrics', { type: 'start', id: i, prompt: finalPrompt.length > 500 ? finalPrompt.substring(0, 100) + '... [Truncated]' : finalPrompt });
 
           try {
             const res = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
@@ -39,7 +48,7 @@ export async function POST(req: NextRequest) {
               },
               body: JSON.stringify({
                 model,
-                messages: [{ role: 'user', content: prompt }],
+                messages: [{ role: 'user', content: finalPrompt }],
                 max_tokens: parseInt(maxTokens) || undefined,
                 stream: true
               })

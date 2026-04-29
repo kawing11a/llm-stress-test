@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [maxTokens, setMaxTokens] = useState('100');
   const [concurrency, setConcurrency] = useState('5');
   const [totalRequests, setTotalRequests] = useState('50');
+  const [contextPadding, setContextPadding] = useState('0');
 
   const [isRunning, setIsRunning] = useState(false);
   const [metrics, setMetrics] = useState<any[]>([]);
@@ -48,7 +49,7 @@ export default function Dashboard() {
       const res = await fetch('/api/stress-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl, apiKey, model, prompt, concurrency, totalRequests, maxTokens })
+        body: JSON.stringify({ baseUrl, apiKey, model, prompt, concurrency, totalRequests, maxTokens, contextPadding })
       });
 
       if (!res.body) throw new Error('No readable stream');
@@ -204,6 +205,10 @@ export default function Dashboard() {
               <div className="space-y-2">
                 <Label>Total Requests</Label>
                 <Input type="number" value={totalRequests} onChange={e => setTotalRequests(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Context Padding (Tokens)</Label>
+                <Input type="number" value={contextPadding} onChange={e => setContextPadding(e.target.value)} />
               </div>
             </div>
             <Button
