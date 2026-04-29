@@ -28,6 +28,24 @@ export default function Dashboard() {
   const [logs, setLogs] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
 
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch('/api/history');
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data);
+      }
+    } catch (e) {
+      console.error('Failed to load history', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchModels();
+    fetchHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fetchModels = async () => {
     try {
       const res = await fetch(`/api/models?baseUrl=${encodeURIComponent(baseUrl)}&apiKey=${encodeURIComponent(apiKey)}`);
@@ -87,8 +105,8 @@ export default function Dashboard() {
                 latencies.sort((a, b) => a - b);
                 const finalP90 = latencies[Math.floor(latencies.length * 0.9)] || 0;
 
-                setHistory(prev => [{
-                  id: prev.length + 1,
+                const newRecord = {
+                  id: Date.now(),
                   timestamp: new Date().toLocaleTimeString(),
                   model: model,
                   concurrency: concurrency,
@@ -99,7 +117,15 @@ export default function Dashboard() {
                   avgTtft: finalAvgTtft,
                   avgTps: finalAvgTps,
                   p90: finalP90
-                }, ...prev]);
+                };
+
+                fetch('/api/history', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(newRecord)
+                }).catch(e => console.error('Failed to save history', e));
+
+                setHistory(prev => [newRecord, ...prev]);
 
                 break;
               }
