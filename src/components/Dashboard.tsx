@@ -23,7 +23,7 @@ export default function Dashboard() {
 
   const [isRunning, setIsRunning] = useState(false);
   const [metrics, setMetrics] = useState<any[]>([]);
-  const [stats, setStats] = useState({ success: 0, error: 0, avgTps: 0, p50: 0, p90: 0, p99: 0 });
+  const [stats, setStats] = useState({ success: 0, error: 0, avgTps: 0, p50: 0, p90: 0, p99: 0, avgTtft: 0 });
   const [logs, setLogs] = useState<any[]>([]);
 
   const fetchModels = async () => {
@@ -42,7 +42,7 @@ export default function Dashboard() {
   const startTest = async () => {
     setIsRunning(true);
     setMetrics([]);
-    setStats({ success: 0, error: 0, avgTps: 0, p50: 0, p90: 0, p99: 0 });
+    setStats({ success: 0, error: 0, avgTps: 0, p50: 0, p90: 0, p99: 0, avgTtft: 0 });
     setLogs([]);
 
     try {
@@ -60,6 +60,7 @@ export default function Dashboard() {
       let successCount = 0;
       let errorCount = 0;
       let tpsSum = 0;
+      let ttftSum = 0;
       let latencies: number[] = [];
 
       while (true) {
@@ -98,6 +99,7 @@ export default function Dashboard() {
                 successCount++;
                 tpsSum += data.tps;
                 latencies.push(data.latency);
+                ttftSum += data.ttft;
 
                 // Update charts
                 currentMetrics = [...currentMetrics, {
@@ -131,6 +133,7 @@ export default function Dashboard() {
                   success: successCount,
                   error: errorCount,
                   avgTps: successCount > 0 ? tpsSum / successCount : 0,
+                  avgTtft: successCount > 0 ? ttftSum / successCount : 0,
                   p50: latencies[Math.floor(latencies.length * 0.5)] || 0,
                   p90: latencies[Math.floor(latencies.length * 0.9)] || 0,
                   p99: latencies[Math.floor(latencies.length * 0.99)] || 0,
@@ -224,11 +227,12 @@ export default function Dashboard() {
 
       {/* Main Content Area */}
       <div className="w-full md:w-2/3 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card><CardContent className="p-4 text-center"><div className="text-sm text-gray-500">Success</div><div className="text-2xl font-bold text-green-500">{stats.success}</div></CardContent></Card>
           <Card><CardContent className="p-4 text-center"><div className="text-sm text-gray-500">Errors</div><div className="text-2xl font-bold text-red-500">{stats.error}</div></CardContent></Card>
+          <Card><CardContent className="p-4 text-center"><div className="text-sm text-gray-500">Avg TTFT</div><div className="text-2xl font-bold">{stats.avgTtft.toFixed(0)}ms</div></CardContent></Card>
           <Card><CardContent className="p-4 text-center"><div className="text-sm text-gray-500">Avg TPS</div><div className="text-2xl font-bold">{stats.avgTps.toFixed(1)}</div></CardContent></Card>
-          <Card><CardContent className="p-4 text-center"><div className="text-sm text-gray-500">P95 Latency</div><div className="text-2xl font-bold">{stats.p90.toFixed(0)}ms</div></CardContent></Card>
+          <Card><CardContent className="p-4 text-center"><div className="text-sm text-gray-500">P90 Latency</div><div className="text-2xl font-bold">{stats.p90.toFixed(0)}ms</div></CardContent></Card>
         </div>
 
         <Card>
