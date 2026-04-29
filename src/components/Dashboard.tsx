@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const [metrics, setMetrics] = useState<any[]>([]);
   const [stats, setStats] = useState({ success: 0, error: 0, avgTps: 0, p50: 0, p90: 0, p99: 0, avgTtft: 0 });
   const [logs, setLogs] = useState<any[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
 
   const fetchModels = async () => {
     try {
@@ -79,6 +81,26 @@ export default function Dashboard() {
               const data = JSON.parse(dataStr);
               if (data.message === 'Test completed') {
                 setIsRunning(false);
+                
+                const finalAvgTps = successCount > 0 ? tpsSum / successCount : 0;
+                const finalAvgTtft = successCount > 0 ? ttftSum / successCount : 0;
+                latencies.sort((a, b) => a - b);
+                const finalP90 = latencies[Math.floor(latencies.length * 0.9)] || 0;
+
+                setHistory(prev => [{
+                  id: prev.length + 1,
+                  timestamp: new Date().toLocaleTimeString(),
+                  model: model,
+                  concurrency: concurrency,
+                  contextPadding: contextPadding,
+                  totalRequests: totalRequests,
+                  success: successCount,
+                  error: errorCount,
+                  avgTtft: finalAvgTtft,
+                  avgTps: finalAvgTps,
+                  p90: finalP90
+                }, ...prev]);
+
                 break;
               }
 
@@ -287,6 +309,48 @@ export default function Dashboard() {
                 <div className="whitespace-pre-wrap"><span className="font-semibold text-green-500 mr-2">Response:</span>{log.response}</div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Test History</CardTitle>
+            <CardDescription>Summary of previous stress tests</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead>Concurrency</TableHead>
+                  <TableHead>Context (Pad)</TableHead>
+                  <TableHead>Success/Err</TableHead>
+                  <TableHead>Avg TTFT</TableHead>
+                  <TableHead>Avg TPS</TableHead>
+                  <TableHead>P90 Latency</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>{record.timestamp}</TableCell>
+                    <TableCell>{record.model}</TableCell>
+                    <TableCell>{record.concurrency}</TableCell>
+                    <TableCell>{record.contextPadding}</TableCell>
+                    <TableCell>{record.success} / {record.error}</TableCell>
+                    <TableCell>{record.avgTtft.toFixed(0)}ms</TableCell>
+                    <TableCell>{record.avgTps.toFixed(1)}</TableCell>
+                    <TableCell>{record.p90.toFixed(0)}ms</TableCell>
+                  </TableRow>
+                ))}
+                {history.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-4">No tests run yet.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>
