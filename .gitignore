@@ -67,3 +67,5 @@ docs/
 # Others
 .cursor/*
 .antigravity/*
+
+*.docx
