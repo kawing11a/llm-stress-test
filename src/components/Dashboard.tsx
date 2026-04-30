@@ -17,9 +17,9 @@ export default function Dashboard() {
   const [model, setModel] = useState('');
 
   const [prompt, setPrompt] = useState('What is the meaning of life?');
-  const [maxTokens, setMaxTokens] = useState('100');
+  const [maxTokens, setMaxTokens] = useState('8192');
   const [concurrency, setConcurrency] = useState('5');
-  const [totalRequests, setTotalRequests] = useState('50');
+  const [totalRequests, setTotalRequests] = useState('5');
   const [contextPadding, setContextPadding] = useState('0');
 
   const [isRunning, setIsRunning] = useState(false);
@@ -99,7 +99,7 @@ export default function Dashboard() {
               const data = JSON.parse(dataStr);
               if (data.message === 'Test completed') {
                 setIsRunning(false);
-                
+
                 const finalAvgTps = successCount > 0 ? tpsSum / successCount : 0;
                 const finalAvgTtft = successCount > 0 ? ttftSum / successCount : 0;
                 latencies.sort((a, b) => a - b);
@@ -157,7 +157,7 @@ export default function Dashboard() {
                   ttft: data.ttft
                 }];
                 setMetrics(currentMetrics);
-                
+
                 setLogs(prev => prev.map(l => l.id === data.id ? {
                   ...l,
                   response: data.response || l.response || '(No response text)',

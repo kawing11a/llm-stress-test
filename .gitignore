@@ -39,3 +39,31 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# data
+.data/history.json
+
+# doc
+docs/
+
+# agent
+.agent/*
+
+# claude
+.claude/*
+
+# worktrees
+.worktrees/*
+
+# vscode
+.vscode/*
+
+# Antigravity
+.antigravity/*
+
+# IDE
+.idea/*
+
+# Others
+.cursor/*
+.antigravity/*
